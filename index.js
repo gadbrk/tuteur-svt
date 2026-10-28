@@ -18,8 +18,12 @@ export default {
           messages: [system, ...messages.slice(-12)]
         });
         return Response.json({ reply: result.response || "Je n'ai pas réussi à générer une réponse. Réessaie." });
-      } catch (error) {
-        return Response.json({ error: "Le tuteur IA n'a pas pu répondre. Vérifie la configuration de Cloudflare AI puis réessaie." }, { status: 500 });
+           } catch (error) {
+        console.error("Erreur Workers AI :", error);
+        return Response.json({
+          error: "Erreur du tuteur IA",
+          details: String(error?.message || error)
+        }, { status: 500 });
       }
     }
 
