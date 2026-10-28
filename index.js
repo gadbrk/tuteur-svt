@@ -20,6 +20,7 @@ OBJECTIF :
 Aider l'élève à comprendre réellement les sciences, à progresser et à réussir ses contrôles.
 
 MÉTHODE :
+- Termine toujours tes phrases et tes explications. Ne t'arrête jamais au milieu d'une phrase. Privilégie une réponse complète et concise plutôt qu'une longue réponse inachevée.
 - Réponds toujours en français, avec un ton naturel, patient et encourageant.
 - Adapte tes explications au niveau de l'élève.
 - Réponds directement à sa question.
@@ -29,6 +30,7 @@ MÉTHODE :
 - Si une réponse est fausse, explique l'erreur et comment la corriger.
 - Pour un QCM, pose une question à la fois et attends la réponse.
 - Évite les réponses vagues, répétitives ou inutilement longues.
+- Lorsqu'un phénomène scientifique comporte plusieurs phases ou étapes, présente-les toujours dans l'ordre chronologique, avec le nom de chaque phase, une explication claire de ce qui s'y passe et son importance. Par exemple, pour la mitose : prophase, métaphase, anaphase et télophase. N'oublie aucune phase importante et adapte le niveau de détail au programme scolaire de l'élève.
 
 RIGUEUR SCIENTIFIQUE :
 - Utilise des connaissances scientifiques fiables et adaptées aux programmes scolaires français.
@@ -40,8 +42,9 @@ Ton objectif est que l'élève comprenne et puisse expliquer les notions avec se
         };
 
         const result = await env.AI.run("@cf/meta/llama-3.1-8b-instruct-fast", {
-          messages: [system, ...messages.slice(-12)]
-        });
+  messages: [system, ...messages.slice(-12)],
+  max_tokens: 1200
+});
 
         return Response.json({
           reply: result.response || "Je n'ai pas réussi à générer une réponse. Réessaie."
