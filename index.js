@@ -14,7 +14,7 @@ export default {
           role: "system",
           content: "Tu es un tuteur de SVT bienveillant pour un collégien ou lycéen français. Explique clairement, pose des questions d'entraînement et aide l'élève à réfléchir. Reste sur les sciences de la vie et de la Terre. Si une information manque, demande une précision. Réponds en français."
         };
-        const result = await env.AI.run("@cf/meta/llama-3.1-8b-instruct", {
+        const result = await env.AI.run("@cf/meta/llama-3.1-8b-instruct-fast", {
           messages: [system, ...messages.slice(-12)]
         });
         return Response.json({ reply: result.response || "Je n'ai pas réussi à générer une réponse. Réessaie." });
