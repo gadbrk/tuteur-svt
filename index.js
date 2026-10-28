@@ -1,81 +1,265 @@
+const SITE_URL =
+  "https://gadbrk.github.io";
+
+const COURSE_URL =
+  "https://gadbrk.github.io/tuteur-svt/SVT_revision_IA_gratuite_en_ligne.html";
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": SITE_URL,
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type",
+  "Vary": "Origin"
+};
+
+function jsonResponse(data, status = 200) {
+  return Response.json(data, {
+    status,
+    headers: corsHeaders
+  });
+}
+
+const SYSTEM_PROMPT = `Tu es un excellent professeur particulier de SVT pour un élève de collège ou de lycée en France.
+
+OBJECTIF :
+Aider l'élève à comprendre réellement les sciences et à progresser.
+
+MÉTHODE :
+- Réponds toujours en français, avec un ton naturel, patient et encourageant.
+- Adapte tes explications au niveau de l'élève.
+- Réponds directement à sa question.
+- Explique les termes scientifiques avec des mots simples.
+- Utilise des exemples concrets et des étapes logiques.
+- Pour un exercice, aide l'élève à raisonner étape par étape.
+- Corrige les erreurs en expliquant pourquoi.
+- Termine tes phrases et tes explications.
+- Lorsqu'un phénomène comporte plusieurs phases, présente-les dans l'ordre chronologique et n'oublie aucune phase importante.
+- Pour la mitose, présente notamment la prophase, la métaphase, l'anaphase et la télophase.
+- Utilise des connaissances scientifiques fiables.
+- N'invente ni faits ni sources. Si tu as un doute, indique-le.
+- Explique le pourquoi et le comment, pas seulement les définitions.
+- Le chapitre étudié sera indiqué dans la demande.
+
+Ton objectif est que l'élève comprenne et puisse expliquer les notions avec ses propres mots.`;
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
 
-    if (url.pathname === "/health") {
-      return new Response("OK", { headers: { "content-type": "text/plain; charset=utf-8" } });
+    // Autoriser le navigateur à vérifier les droits CORS.
+    if (
+      request.method === "OPTIONS" &&
+      (url.pathname === "/api/tutor" ||
+       url.pathname === "/api/chat")
+    ) {
+      return new Response(null, {
+        status: 204,
+        headers: corsHeaders
+      });
     }
 
-   
-    if (url.pathname === "/api/chat" && request.method === "POST") {
+    if (url.pathname === "/health") {
+      return new Response("OK", {
+        headers: {
+          "content-type": "text/plain; charset=utf-8"
+        }
+      });
+    }
+
+    // La route utilisée par le tuteur intégré au site de cours.
+    if (
+      url.pathname === "/api/tutor" &&
+      request.method === "POST"
+    ) {
       try {
         const body = await request.json();
-        const messages = Array.isArray(body.messages) ? body.messages : [];
 
-        const system = {
-          role: "system",
-          content: `Tu es un excellent professeur particulier de SVT pour un élève de collège ou de lycée en France.
+        const mode = body.mode === "quiz" ? "quiz" : "chat";
+        const message = String(body.message || "").trim().slice(0, 1200);
+        const chapter = String(body.chapter || "SVT niveau lycée").slice(0, 200);
 
-OBJECTIF :
-Aider l'élève à comprendre réellement les sciences, à progresser et à réussir ses contrôles.
+        if (!message) {
+          return jsonResponse({
+            error: "Écris une question avant d'envoyer."
+          }, 400);
+        }
 
-MÉTHODE :
-- Termine toujours tes phrases et tes explications. Ne t'arrête jamais au milieu d'une phrase. Privilégie une réponse complète et concise plutôt qu'une longue réponse inachevée.
-- Réponds toujours en français, avec un ton naturel, patient et encourageant.
-- Adapte tes explications au niveau de l'élève.
-- Réponds directement à sa question.
-- Explique les notions difficiles avec des mots simples et définis les termes scientifiques.
-- Utilise des exemples concrets et des étapes logiques.
-- Pour un exercice, aide l'élève à raisonner étape par étape.
-- Si une réponse est fausse, explique l'erreur et comment la corriger.
-- Pour un QCM, pose une question à la fois et attends la réponse.
-- Évite les réponses vagues, répétitives ou inutilement longues.
-- Lorsqu'un phénomène scientifique comporte plusieurs phases ou étapes, présente-les toujours dans l'ordre chronologique, avec le nom de chaque phase, une explication claire de ce qui s'y passe et son importance. Par exemple, pour la mitose : prophase, métaphase, anaphase et télophase. N'oublie aucune phase importante et adapte le niveau de détail au programme scolaire de l'élève.
+        const history = Array.isArray(body.history)
+          ? body.history
+              .filter(item =>
+                item &&
+                ["user", "assistant"].includes(item.role) &&
+                typeof item.content === "string"
+              )
+              .slice(-8)
+              .map(item => ({
+                role: item.role,
+                content: item.content.slice(0, 2000)
+              }))
+          : [];
 
-RIGUEUR SCIENTIFIQUE :
-- Utilise des connaissances scientifiques fiables et adaptées aux programmes scolaires français.
-- N'invente pas de faits, de chiffres ou de sources.
-- Si tu as un doute, indique-le honnêtement.
-- Explique le pourquoi et le comment des phénomènes, pas seulement leur définition.
+        let userPrompt;
 
-Ton objectif est que l'élève comprenne et puisse expliquer les notions avec ses propres mots.`
-        };
+        if (mode === "quiz") {
+          userPrompt = `Crée exactement 5 questions de QCM inédites en SVT sur le chapitre : "${chapter}".
 
-        const result = await env.AI.run("@cf/meta/llama-3.1-8b-instruct-fast", {
-  messages: [system, ...messages.slice(-12)],
-  max_tokens: 1200
-});
+Niveau : Première ou Terminale, selon le chapitre.
 
-        return Response.json({
-          reply: result.response || "Je n'ai pas réussi à générer une réponse. Réessaie."
+Réponds uniquement avec un objet JSON valide, sans Markdown ni texte autour, sous cette forme :
+{
+  "questions": [
+    {
+      "question": "Question",
+      "options": ["Choix A", "Choix B", "Choix C", "Choix D"],
+      "answer": 0,
+      "explanation": "Explication de la bonne réponse"
+    }
+  ]
+}
+
+Règles :
+- Chaque question comporte exactement 4 propositions.
+- "answer" est l'indice numérique de la bonne réponse : 0, 1, 2 ou 3.
+- Les explications sont scientifiquement exactes.
+- Les questions portent sur le chapitre indiqué.
+- Ne mets pas la bonne réponse dans la formulation de la question.
+- Fournis exactement 5 questions.`;
+        } else {
+          userPrompt = `Chapitre étudié : ${chapter}\n\nQuestion de l'élève : ${message}`;
+        }
+
+        const result = await env.AI.run(
+          "@cf/meta/llama-3.1-8b-instruct-fast",
+          {
+            messages: [
+              {
+                role: "system",
+                content: mode === "quiz"
+                  ? SYSTEM_PROMPT + "\nPour cette demande, produis le QCM au format JSON demandé."
+                  : SYSTEM_PROMPT
+              },
+              ...(mode === "chat" ? history : []),
+              {
+                role: "user",
+                content: userPrompt
+              }
+            ],
+            max_tokens: mode === "quiz" ? 1800 : 1200
+          }
+        );
+
+        const answer = String(result.response || "").trim();
+
+        if (!answer) {
+          return jsonResponse({
+            error: "L'IA n'a pas généré de réponse. Réessaie."
+          }, 502);
+        }
+
+        if (mode === "chat") {
+          return jsonResponse({ answer });
+        }
+
+        // Convertir la réponse du modèle en données de quiz.
+        const cleaned = answer
+          .replace(/^```(?:json)?\s*/i, "")
+          .replace(/\s*```$/, "")
+          .trim();
+
+        let parsed;
+
+        try {
+          parsed = JSON.parse(cleaned);
+        } catch {
+          console.error("Réponse QCM non JSON :", answer);
+          return jsonResponse({
+            error: "Le quiz n'a pas pu être formaté correctement. Réessaie."
+          }, 502);
+        }
+
+        const questions = Array.isArray(parsed)
+          ? parsed
+          : parsed.questions;
+
+        if (
+          !Array.isArray(questions) ||
+          questions.length === 0 ||
+          !questions.every(q =>
+            typeof q.question === "string" &&
+            Array.isArray(q.options) &&
+            q.options.length === 4 &&
+            q.options.every(o => typeof o === "string") &&
+            Number.isInteger(q.answer) &&
+            q.answer >= 0 &&
+            q.answer <= 3
+          )
+        ) {
+          return jsonResponse({
+            error: "Le quiz généré est incomplet. Réessaie."
+          }, 502);
+        }
+
+        return jsonResponse({
+          questions: questions.slice(0, 5)
         });
       } catch (error) {
         console.error("Erreur Workers AI :", error);
-        return Response.json({
-          error: "Erreur du tuteur IA",
+
+        return jsonResponse({
+          error: "Erreur du tuteur IA.",
           details: String(error?.message || error)
-        }, { status: 500 });
+        }, 500);
       }
     }
 
-    if (url.pathname !== "/" && url.pathname !== "/index.html") {
-      return new Response("Page introuvable", { status: 404 });
+    // Conserver l'ancienne route /api/chat si elle est encore utilisée.
+    if (
+      url.pathname === "/api/chat" &&
+      request.method === "POST"
+    ) {
+      try {
+        const body = await request.json();
+        const messages = Array.isArray(body.messages)
+          ? body.messages
+              .filter(m =>
+                m &&
+                ["user", "assistant"].includes(m.role) &&
+                typeof m.content === "string"
+              )
+              .slice(-12)
+          : [];
+
+        const result = await env.AI.run(
+          "@cf/meta/llama-3.1-8b-instruct-fast",
+          {
+            messages: [
+              { role: "system", content: SYSTEM_PROMPT },
+              ...messages
+            ],
+            max_tokens: 1200
+          }
+        );
+
+        return jsonResponse({
+          reply: result.response || "Je n'ai pas réussi à générer une réponse."
+        });
+      } catch (error) {
+        console.error("Erreur /api/chat :", error);
+
+        return jsonResponse({
+          error: "Erreur du tuteur IA.",
+          details: String(error?.message || error)
+        }, 500);
+      }
     }
 
-    const html = `<!doctype html>
-<html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Tuteur IA de SVT</title>
-<style>
-body{font-family:Arial,sans-serif;max-width:850px;margin:0 auto;padding:20px;background:#f3f7fb;color:#18212f}h1{color:#176b55}#chat{background:white;border:1px solid #d9e2ec;border-radius:14px;padding:16px;min-height:300px;max-height:55vh;overflow:auto}.msg{padding:12px 14px;border-radius:12px;margin:10px 0;white-space:pre-wrap;line-height:1.5}.bot{background:#e8f5ef}.user{background:#eaf1ff;margin-left:12%}textarea{box-sizing:border-box;width:100%;min-height:90px;padding:12px;margin-top:12px;border:1px solid #bbc8d6;border-radius:10px;font:inherit}button{cursor:pointer;border:0;border-radius:9px;padding:11px 15px;margin:5px 5px 5px 0;background:#176b55;color:white;font-weight:bold}.suggest{background:#dcefe7;color:#174b3c}#status{color:#536273;font-size:14px}
-</style></head><body><h1>🌱 Mon tuteur IA de SVT</h1><p>Pose une question, demande une explication ou crée un exercice adapté à ton niveau.</p>
-<div><button class="suggest" data-prompt="Explique-moi la mitose simplement avec un exemple.">Expliquer la mitose</button><button class="suggest" data-prompt="Crée un QCM de 5 questions de SVT et attends mes réponses une par une.">Faire un QCM</button><button class="suggest" data-prompt="Fais-moi réviser l'ADN avec des questions progressives.">Réviser l'ADN</button></div>
-<div id="chat" aria-live="polite"><div class="msg bot">Bonjour ! Je suis ton tuteur IA de SVT. Qu'aimerais-tu apprendre aujourd'hui ?</div></div>
-<textarea id="prompt" placeholder="Écris ta question ici..."></textarea><button id="send">Envoyer</button><p id="status">Conseil : précise ton niveau et le chapitre que tu révises.</p>
-<script>
-const chat=document.getElementById('chat'),input=document.getElementById('prompt'),send=document.getElementById('send'),status=document.getElementById('status');const history=[];
-function add(text,who){const div=document.createElement('div');div.className='msg '+who;div.textContent=text;chat.appendChild(div);chat.scrollTop=chat.scrollHeight;return div;}
-async function ask(){const text=input.value.trim();if(!text)return;input.value='';add(text,'user');history.push({role:'user',content:text});send.disabled=true;status.textContent='Le tuteur réfléchit…';const waiting=add('Je prépare une réponse…','bot');try{const response=await fetch('/api/chat',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({messages:history})});const data=await response.json();waiting.textContent = data.reply || (data.details ? data.error + " : " + data.details : data.error) || 'Une erreur est survenue.';if(data.reply)history.push({role:'assistant',content:data.reply});}catch(e){waiting.textContent='Impossible de contacter le tuteur. Vérifie ta connexion puis réessaie.';}finally{send.disabled=false;status.textContent='Tu peux poser une autre question.';input.focus();}}
-send.addEventListener('click',ask);input.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();ask();}});document.querySelectorAll('[data-prompt]').forEach(b=>b.addEventListener('click',()=>{input.value=b.dataset.prompt;ask();}));
-</script></body></html>`;
-    return new Response(html, { headers: { "content-type": "text/html; charset=utf-8" } });
+    // La page principale du Worker redirige vers le vrai site de cours.
+    if (
+      request.method === "GET" &&
+      (url.pathname === "/" || url.pathname === "/index.html")
+    ) {
+      return Response.redirect(COURSE_URL, 302);
+    }
+
+    return new Response("Page introuvable", { status: 404 });
   }
 };
