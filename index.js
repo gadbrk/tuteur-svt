@@ -6,17 +6,12 @@ export default {
       return new Response("OK", { headers: { "content-type": "text/plain; charset=utf-8" } });
     }
 
+   
     if (url.pathname === "/api/chat" && request.method === "POST") {
       try {
         const body = await request.json();
         const messages = Array.isArray(body.messages) ? body.messages : [];
-        const system = {
-         
 
-    if (url.pathname === "/api/chat" && request.method === "POST") {
-      try {
-        const body = await request.json();
-        const messages = Array.isArray(body.messages) ? body.messages : [];
         const system = {
           role: "system",
           content: `Tu es un excellent professeur particulier de SVT pour un élève de collège ou de lycée en France.
@@ -43,16 +38,15 @@ RIGUEUR SCIENTIFIQUE :
 
 Ton objectif est que l'élève comprenne et puisse expliquer les notions avec ses propres mots.`
         };
-        const result = await env.AI.run("@cf/meta/llama-3.1-8b-instruct-fast", {
-          messages: [system, ...messages.slice(-12)]
-        });
-
 
         const result = await env.AI.run("@cf/meta/llama-3.1-8b-instruct-fast", {
           messages: [system, ...messages.slice(-12)]
         });
-        return Response.json({ reply: result.response || "Je n'ai pas réussi à générer une réponse. Réessaie." });
-           } catch (error) {
+
+        return Response.json({
+          reply: result.response || "Je n'ai pas réussi à générer une réponse. Réessaie."
+        });
+      } catch (error) {
         console.error("Erreur Workers AI :", error);
         return Response.json({
           error: "Erreur du tuteur IA",
