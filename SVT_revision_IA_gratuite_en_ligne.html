@@ -3743,7 +3743,7 @@ console.log(
    if(busy)return;busy=true;send.disabled=true;document.getElementById('svt-ai-makequiz').disabled=true;
    const wait=addMessage(mode==='quiz'?'Je prépare un quiz inédit…':'Je réfléchis à ta question…','bot');
    try{
-     const res=await fetch('/api/tutor',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mode,message,chapter:currentChapter(),history:history.slice(-8)})});
+     const res=await fetch('https://tuteur-svt.berkigad2009.workers.dev/api/tutor',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mode,message,chapter:currentChapter(),history:history.slice(-8)})});
      const data=await res.json().catch(()=>({error:'Réponse du serveur illisible.'}));
      if(!res.ok)throw new Error(data.error||'Erreur du serveur.');
      wait.remove();
